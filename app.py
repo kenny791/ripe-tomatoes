@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 app = Flask(__name__)
 from flask_sqlalchemy import SQLAlchemy
-
+from flask_marshmallow import Marshmallow
 
 app = Flask(__name__)
 
@@ -9,6 +9,50 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI']='postgresql+psycopg2://tomato_dev:password123@127.0.0.1:5432/ripe_tomatoes_db'
 
 db = SQLAlchemy(app)
+ma = Marshmallow(app)
+
+
+# MODELS AREA
+
+class Movie(db.Model):
+  __tablename__ ='movies'
+  id = db.Column(db.Integer, primary_key=True)
+  title =db.Column(db.String(100))
+  genre =db.Column(db.String(50))
+  length =db.Column(db.Integer)
+  year = db.Column(db.Integer)
+
+
+class Actor(db.Model):
+  __tablename__ ='actors'
+  id = db.Column(db.Integer, primary_key=True)
+  first_name =db.Column(db.String(100))
+  last_name =db.Column(db.String(100))
+  gender =db.Column(db.String(20))
+  country =db.Column(db.String(50))
+  dob =db.Column(db.String(20))
+
+
+
+# SCHEMAS AREA
+class MovieSchema(ma.Schema):
+  class Meta:
+    fields = ('id', 'title','genre','length','year')
+
+class ActorSchema(ma.Schema):
+  class Meta:
+    fields = ('id', 'first_name','last_name','gender','country','dob')
+
+movie_schema=MovieSchema()
+movies_schema=MovieSchema(many=True)
+actor_schema=ActorSchema()
+actors_schema=ActorSchema(many=True)
+
+
+
+
+
+
 
 # CLI COMMANDS AREA
 @app.cli.command('drop')
@@ -80,37 +124,11 @@ def seed_db():
 )
   db.session.add(actor4)
 
-
-
   db.session.commit()
   print('actor seeded')
 
 
 
-
-# MODELS AREA
-
-class Movie(db.Model):
-  __tablename__ ='movies'
-  id = db.Column(db.Integer, primary_key=True)
-  title =db.Column(db.String(100))
-  genre =db.Column(db.String(50))
-  length =db.Column(db.Integer)
-  year = db.Column(db.Integer)
-
-
-class Actor(db.Model):
-  __tablename__ ='actors'
-  id = db.Column(db.Integer, primary_key=True)
-  first_name =db.Column(db.String(100))
-  last_name =db.Column(db.String(100))
-  gender =db.Column(db.String(20))
-  country =db.Column(db.String(50))
-  dob =db.Column(db.String(20))
-
-
-
-# SCHEMAS AREA
 
 
 
@@ -119,3 +137,16 @@ class Actor(db.Model):
 @app.route("/")
 def hello():
   return "Welcome to Ripe Tomatoes API"
+
+@app.route("/movies", methods=['GET'])
+def get_movies():
+  movies_list = Movie.query.all()
+  result = movies_schema.dump(movies_list)
+  return jsonify(result)
+
+@app.route("/actors", methods=['GET'])
+def get_actors():
+  actors_list = Actor.query.all()
+  result = actors_schema.dump(actors_list)
+  return jsonify(result)
+
