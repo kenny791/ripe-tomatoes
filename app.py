@@ -3,16 +3,20 @@ app = Flask(__name__)
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_bcrypt import Bcrypt
-
+from flask_jwt_extended import JWTManager, create_access_token
+from datetime import timedelta
 
 app = Flask(__name__)
 
 ## DB CONNECTION AREA
 app.config['SQLALCHEMY_DATABASE_URI']='postgresql+psycopg2://tomato_dev:password123@127.0.0.1:5432/ripe_tomatoes_db'
+# register JWT secret key
+app.config["JWT_SECRET_KEY"] = "Backend best end" 
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
 bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
 # MODELS AREA
 
@@ -205,3 +209,21 @@ def auth_register():
     db.session.commit()
     #Return the user to check the request was successful
     return jsonify(user_schema.dump(user))
+
+#routes declaration area
+@app.route("/auth/signin", methods=["POST"])
+def auth_login():
+    #get the user data from the request
+    user_fields = user_schema.load(request.json)
+    #find the user in the database by email
+    user = User.query.filter_by(email=user_fields["email"]).first()
+    # there is not a user with that email or if the password is no correct send an error
+    if not user or not bcrypt.check_password_hash(user.password, user_fields["password"]):
+        return abort(401, description="Incorrect username and password")
+
+    #create a variable that sets an expiry date
+    expiry = timedelta(days=1)
+    #create the access token
+    access_token = create_access_token(identity=str(user.id), expires_delta=expiry)
+    # return the user email and the access token
+    return jsonify({"user":user.email, "token": access_token })
