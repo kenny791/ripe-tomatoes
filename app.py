@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 app = Flask(__name__)
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
@@ -182,6 +182,16 @@ def get_actors():
 
 @app.route("/auth/signup", methods=["POST"])
 def auth_register():
+    #The request data will be loaded in a user_schema converted to JSON. request needs to be imported from
+    user_fields = user_schema.load(request.json)
+    # find the user
+    user = User.query.filter_by(email=user_fields["email"]).first()
+
+    if user:
+        # return an abort message to inform the user. That will end the request
+        return abort(400, description="Email already registered")
+    # Create the user object
+    user = User()
     #The request data will be loaded in a user_schema converted to JSON. request needs to be imported from
     user_fields = user_schema.load(request.json)
     #Create the user object
