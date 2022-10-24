@@ -1,7 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 app = Flask(__name__)
 from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
+from flask_bcrypt import Bcrypt
+
 
 app = Flask(__name__)
 
@@ -10,7 +12,7 @@ app.config['SQLALCHEMY_DATABASE_URI']='postgresql+psycopg2://tomato_dev:password
 
 db = SQLAlchemy(app)
 ma = Marshmallow(app)
-
+bcrypt = Bcrypt(app)
 
 # MODELS AREA
 
@@ -33,6 +35,13 @@ class Actor(db.Model):
   dob =db.Column(db.String(20))
 
 
+class User(db.Model):
+  __tablename__ = "USERS"
+  id = db.Column(db.Integer, primary_key=True)
+  email = db.Column(db.String(), nullable=False, unique=True)
+  password = db.Column(db.String(), nullable=False)
+  is_admin = db.Column(db.Boolean(), default=False)
+
 
 # SCHEMAS AREA
 class MovieSchema(ma.Schema):
@@ -49,6 +58,12 @@ actor_schema=ActorSchema()
 actors_schema=ActorSchema(many=True)
 
 
+class UserSchema(ma.SQLAlchemyAutoSchema):
+  class Meta:
+    fields = ('email','password',"is_admin")
+
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
 
 
 
@@ -124,12 +139,27 @@ def seed_db():
 )
   db.session.add(actor4)
 
-  db.session.commit()
   print('actor seeded')
 
+# seed users
+
+  admin=User(
+    email='admin@spam.com',
+    password=bcrypt.generate_password_hash('eggs').decode('utf-8'),
+    is_admin=True
+    )
+  db.session.add(admin)
+  user1=User(
+    email='aaa@spam.com',
+    password=bcrypt.generate_password_hash('eggs').decode('utf-8'),
+    is_admin=False
+    )
+  db.session.add(user1)
 
 
+  print('user seeded')
 
+  db.session.commit()
 
 
 # ROUTING AREA
@@ -150,3 +180,18 @@ def get_actors():
   result = actors_schema.dump(actors_list)
   return jsonify(result)
 
+@app.route("/auth/signup", methods=["POST"])
+def auth_register():
+    #The request data will be loaded in a user_schema converted to JSON. request needs to be imported from
+    user_fields = user_schema.load(request.json)
+    #Create the user object
+    user = User()
+    #Add the email attribute
+    user.email = user_fields["email"]
+    #Add the password attribute hashed by bcrypt
+    user.password = bcrypt.generate_password_hash(user_fields["password"]).decode("utf-8")
+    #Add it to the database and commit the changes
+    db.session.add(user)
+    db.session.commit()
+    #Return the user to check the request was successful
+    return jsonify(user_schema.dump(user))
